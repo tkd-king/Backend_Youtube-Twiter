@@ -42,7 +42,7 @@ router
   .patch(varifyJWT, upload.single("avatar"), apdateUserAvatar);
 router
   .route("/cover-Image")
-  .patch(varifyJWT, upload.single("coverImage"), apdateUserCoverImage); // TODO: yaha pr /cover-Image likha h sir nay mn nay / nahe likha error hoa to dekh lo ga
+  .patch(varifyJWT, upload.single("coverImage"), apdateUserCoverImage); // TODO: / ky waqi mistake the :)
 router.route("/c/:username").get(varifyJWT, getUserChennleProfile);
-router.route("/watchHistory").get(varifyJWT, getWatvchHistory);
+router.route("/history").get(varifyJWT, getWatvchHistory);
 export default router;
