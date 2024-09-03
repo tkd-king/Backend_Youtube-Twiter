@@ -237,7 +237,7 @@ const apdateAcountDetails = asyncHandler(async (req, res) => {
   if (!fullName || !email) {
     throw new ApiError(400, "All fields are required");
   }
-  const user = User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
@@ -264,7 +264,7 @@ const apdateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Error while uploading avatar");
   }
   const user = await User.findByIdAndUpdate(
-   req.user._id,
+    req.user._id,
     {
       $set: {
         avatar: avatar.url,
@@ -301,8 +301,123 @@ const apdateUserCoverImage = asyncHandler(async (req, res) => {
   ).select(" -password");
 
   return res
+    .status(200)
+    .json(new ApiResponse(200, user, "CoverImage Updated Successfully"));
+});
+// yaha say agregation piplines ka topic shoro hoa h :) mn is piplines ky video ko dobara dekhna chaho ga
+const getUserChennleProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelSubscribedCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelSubscribedCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+      },
+    },
+  ]);
+  if (!channel?.length) {
+    throw new ApiError(404, "channel does not exists");
+  }
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    );
+});
+
+const getWatvchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $project: {
+              // ya wali pipline add ky h woner field ko overwrite kr k us mn say direct object frontend ko bhejnay k leay nahe to array jay ga or frontend walay ko loop lgana pray ga
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+  return res
   .status(200)
-  .json(new ApiResponse(200, user, "CoverImage Updated Successfully"));
+  .json(new ApiResponse( 200, user[0].watchHistory, "WatchHistory Fetched successfully"))
+
 });
 
 export {
@@ -315,4 +430,6 @@ export {
   apdateAcountDetails,
   apdateUserAvatar,
   apdateUserCoverImage,
+  getUserChennleProfile,
+  getWatvchHistory
 };
