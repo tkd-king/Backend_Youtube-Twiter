@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinory } from "../utils/cloudinory.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const genrateAccessAndRefreshToken = async (userId) => {
   try {
@@ -24,6 +25,15 @@ const genrateAccessAndRefreshToken = async (userId) => {
 };
 //asyncHandler
 const ragisterUser = asyncHandler(async (req, res) => {
+  //get user details from frontend 
+  //validation - not empty
+  //chek if user already exists: username , email
+  //chek for images chek for avatar 
+  //upload them to cloudinory , avatar 
+  //create user object -  create entry in db
+  //remove password and refreshtoken fields from response 
+  //chek for user creation 
+  //return res
   const { fullName, email, username, password } = req.body;
   console.log("email: ", email);
   console.log("fullName: ", fullName);
@@ -159,8 +169,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     req.user._id,
 
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken:1,// $set ky jaga mn nay $unset ka use kia h kio k $set say massage to a raha h k logout but database say log out nahe ho raha :)
       },
     },
     {
@@ -216,13 +226,17 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
+  
   const user = await User.findById(req.user?._id);
-  const isPasswordCorrect = user.isPasswordCorrect(oldPassword);
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
   if (!isPasswordCorrect) {
     throw new ApiError(401, "Incorrect current password");
   }
   user.password = newPassword;
+  console.log("userpassowrd", user.password);
+  
   await user.save({ validateBeforeSave: true });
+  
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password changed successfully"));
@@ -233,8 +247,13 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, req.user, "current user fetched successfully"));
 });
 const apdateAcountDetails = asyncHandler(async (req, res) => {
+  //mn nay postman say test kia but mn formdata bhej raha 
+  //tha to required fields undifined a rahay thay
+  //but mn nay jeasay json form mn data dia to fields mn data a gea :) 
   const { fullName, email, username } = req.body;
-  if (!fullName || !email) {
+  console.log("fullname:",fullName,"email:",email,"username",username);
+  
+  if (!(fullName && email)) {
     throw new ApiError(400, "All fields are required");
   }
   const user = await User.findByIdAndUpdate(
